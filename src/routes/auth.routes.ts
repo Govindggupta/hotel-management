@@ -1,58 +1,125 @@
 import { Router, Request, Response } from "express";
-import {prisma} from '../../db'
+import {prisma} from '../../db';
+import bcrypt from 'bcrypt';
+import jsonwebtoken from 'jsonwebtoken';
 
 const router = Router();
 
-router.post('/signup',  async (req:Request, res:Response) => {
+router.post("/signup", async (req: Request, res: Response) => {
+  const { name, email, password, phone, role } = req.body;
 
-  const body = req.body ?? {};
-  const { name, email, password, role, phone } = body;
-
-
+  if (!name || !email || !password || !role) {
+    return res.status(400).json({
+      success: false,
+      data: null,
+      error: "INVALID_REQUEST",
+    });
+  }
 
   try {
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "name, email and password are required" });
+    const existingUser = await prisma.users.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: "EMAIL_ALREADY_EXISTS",
+      });
     }
 
-    // Normalize role to match Prisma enum userRole (CUSTOMER/OWNER)
-    let normalizedRole: "CUSTOMER" | "OWNER" | undefined;
-    if (typeof role === "string") {
-      const lower = role.toLowerCase();
-      if (lower === "owner") normalizedRole = "OWNER";
-      else if (lower === "customer") normalizedRole = "CUSTOMER";
-    }
-
-    // Normalize phone to Int? as defined in Prisma schema
-    let normalizedPhone: number | undefined;
-    if (phone !== undefined && phone !== null) {
-      const digits = String(phone).replace(/\D/g, "");
-      if (digits.length > 0) {
-        normalizedPhone = parseInt(digits, 10);
-      }
-    }
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.users.create({
       data: {
         name,
         email,
-        password, // TODO: hash in real app
-        // if normalizedRole is undefined, Prisma will use default(CUSTOMER)
-        ...(normalizedRole ? { role: normalizedRole } : {}),
-        ...(normalizedPhone !== undefined ? { phone: normalizedPhone } : {}),
+        password: hashedPassword,
+        phone,
+        role,
       },
     });
 
-    const { password: _pw, ...safeUser } = user;
 
     return res.status(201).json({
-      message: "User created successfully",
-      user: safeUser,
+      success: true,
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
+      error: null,
     });
   } catch (error) {
-    console.error("Error creating user:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: "INTERNAL_SERVER_ERROR",
+    });
   }
 });
+
+router.post("/login", async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      data: null,
+      error: "INVALID_REQUEST",
+    });
+  }
+
+  try {
+    const user = await prisma.users.findUnique({
+      where: {
+        email,
+      },
+    });
+
+    const passwordMatch = bcrypt.compare(password, user?.password as string);
+
+
+    if (!user || !passwordMatch) {
+      return res.status(401).json({
+        success: false,
+        data: null,
+        error: "INVALID_CREDENTIALS",
+      });
+    }
+
+    const token = jsonwebtoken.sign(
+      { id: user?.id },
+      process.env.JWT_SECRET as string,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        token: token,
+        user: {
+          id : user.id,
+          name: user.name, 
+          email : user.email, 
+          role : user.role
+        } 
+      },
+      error:null 
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: "INTERNAL_SERVER_ERROR",
+    });
+  }
+});
+
+
 
 export default router;
