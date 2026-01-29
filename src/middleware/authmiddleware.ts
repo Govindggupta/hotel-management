@@ -19,7 +19,7 @@ const authMiddleware = async (req: AuthRequest,res: Response,  next: NextFunctio
       return res.status(401).json({
         success: false,
         data: null,
-        error: "TOKEN_REQUIRED",
+        error: "UNAUTHORIZED",
       });
     }
 
@@ -38,12 +38,10 @@ const authMiddleware = async (req: AuthRequest,res: Response,  next: NextFunctio
       });
     }
     
-    console.log(user)
 
     const {password: _, ...userWithoutPassword} = user;
 
     req.user = userWithoutPassword;
-    console.log(req.user)
 
     next();
   } catch (error) {

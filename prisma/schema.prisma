@@ -38,21 +38,22 @@ model Hotels {
   total_reviews Int        @default(0)
   createdAt     DateTime   @default(now())
   user          Users      @relation(fields: [owner_id], references: [id])
-  rooms         Rooms?
+  rooms         Rooms[]
   bookings      Bookings[]
   reviews       Reviews[]
 }
 
 model Rooms {
   id              String     @id @default(uuid())
-  hotel_id        String     @unique
-  room_number     String     @unique
+  hotel_id        String     
+  room_number     String     
   room_type       String
   price_per_night Decimal    @db.Decimal(10, 2)
   max_occupancy   Int
   createdAt       DateTime   @default(now())
   hotel           Hotels     @relation(fields: [hotel_id], references: [id])
   bookings        Bookings[]
+  @@unique([hotel_id, room_number])
 }
 
 enum bookingStatus {
