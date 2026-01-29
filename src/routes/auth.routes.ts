@@ -55,10 +55,10 @@ router.post("/signup", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
       data: null,
-      error: "INTERNAL_SERVER_ERROR",
+      error: "INVALID_REQUEST",
     });
   }
 });
@@ -112,10 +112,10 @@ router.post("/login", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
       data: null,
-      error: "INTERNAL_SERVER_ERROR",
+      error: "INVALID_REQUEST",
     });
   }
 });

@@ -49,10 +49,10 @@ router.post('/' ,authMiddleware, async (req:Request, res:Response) => {
         })
 
     } catch (error) {
-      return res.status(500).json({
+      return res.status(400).json({
         success: false,
         data: null,
-        error: "INTERNAL_SERVER_ERROR",
+        error: "INVALID_REQUEST",
       });
     }
 })
@@ -121,13 +121,105 @@ router.post('/:hotelId/rooms', authMiddleware, async (req: Request, res: Respons
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
       data: null,
-      error: "INTERNAL_SERVER_ERROR",
+      error: "INVALID_REQUEST",
     });
   }
 });
 
+router.get("/", authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { city, country, minPrice, maxPrice, minRating } = req.query;
+
+    const whereClause: any = {};
+
+    if (city) {
+      whereClause.city = {
+        equals: city as string,
+        mode: "insensitive",
+      };
+    }
+
+    if (country) {
+      whereClause.country = {
+        equals: country as string,
+        mode: "insensitive",
+      };
+    }
+
+    if (minRating) {
+      whereClause.rating = {
+        gte: Number(minRating),
+      };
+    }
+
+    if (minPrice || maxPrice) {
+      whereClause.rooms = {
+        some: {
+          price_per_night: {},
+        },
+      };
+
+      if (minPrice) {
+        whereClause.rooms.some.price_per_night.gte = Number(minPrice);
+      }
+
+      if (maxPrice) {
+        whereClause.rooms.some.price_per_night.lte = Number(maxPrice);
+      }
+    }
+
+    const hotels = await prisma.hotels.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        city: true,
+        country: true,
+        amenities: true,
+        rating: true,
+        total_reviews: true,
+        rooms: {
+          select: {
+            price_per_night: true,
+          },
+        },
+      },
+    });
+
+    const formattedHotels = hotels.map((hotel) => {
+      const prices = hotel.rooms.map((room) => room.price_per_night.toNumber());
+
+      return {
+        id: hotel.id,
+        name: hotel.name,
+        description: hotel.description,
+        city: hotel.city,
+        country: hotel.country,
+        amenities: hotel.amenities,
+        rating: hotel.rating,
+        totalReviews: hotel.total_reviews,
+        minPricePerNight:prices.length > 0 ? Math.min(...prices) : null,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: formattedHotels,
+      error: null,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(400).json({
+      success: false,
+      data: null,
+      error: "INVALID_REQUEST",
+    });
+  }
+});
 
 export default router;
+
