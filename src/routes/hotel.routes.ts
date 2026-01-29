@@ -221,5 +221,72 @@ router.get("/", authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
+
+router.get("/:hotelId", authMiddleware, async (req: Request, res: Response) => {
+  const hotelId = req.params.hotelId;
+  try {
+    const hotel = await prisma.hotels.findUnique({
+      where: {
+        id: hotelId as string,
+      },
+      select: {
+        id: true,
+        owner_id: true,
+        name: true,
+        description: true,
+        city: true,
+        country: true,
+        amenities: true,
+        rating: true,
+        total_reviews: true,
+        rooms: {
+          select: {
+            id: true,
+            room_number: true,
+            room_type: true,
+            price_per_night: true,
+            max_occupancy: true,
+          },
+        },
+      },
+    });
+
+    if (!hotel) {
+      res.status(404).json({
+        success: true,
+        data: null,
+        error: "HOTEL_NOT_FOUND",
+      });
+    }
+
+
+    const formattedHotel = {
+      ...hotel,
+      ownerId: hotel?.owner_id,
+      totalReviews: hotel?.total_reviews,
+      rating: Number(hotel?.rating),
+      rooms: hotel?.rooms.map((room) => ({
+        id: room.id,
+        roomNumber: room.room_number,
+        roomType: room.room_type,
+        pricePerNight: Number(room.price_per_night),
+        maxOccupancy: room.max_occupancy,
+      })),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: formattedHotel,
+      error: null,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(400).json({
+      success: false,
+      data: null,
+      error: "INVALID_REQUEST",
+    });
+  }
+});
 export default router;
 
