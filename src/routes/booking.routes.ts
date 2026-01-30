@@ -219,9 +219,89 @@ router.get("/", authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-router.post('/:bookingId/cancel', authMiddleware, async (req:Request, res: Response) => {
+router.put('/:bookingId/cancel', authMiddleware, async (req:Request, res: Response) => {
 
-  
+  //@ts-ignore
+  const user = req.user;
+  const bookingId = req.params.bookingId
+
+  try {
+
+    const booking = await prisma.bookings.findFirst({
+      where : {
+        id: bookingId as string
+      }
+    })
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false , 
+        data: null, 
+        error: "BOOKING_NOT_FOUND"
+      })
+    }
+
+    if (user.id !== booking?.user_id) {
+      return res.status(403).json({
+        success: false, 
+        data: null, 
+        error: "FORBIDDEN"
+      })
+    }
+
+    if (booking?.status === bookingStatus.CANCELLED) {
+      return res.status(400).json({
+        success: false, 
+        data: null, 
+        error: "ALREADY_CANCELLED"
+      })
+    }
+
+    const now = new Date();
+    const checkInDate = new Date(booking.check_in_date);
+
+    const hoursUntillChekin = (+checkInDate - +now )/ (1000 * 60 * 60); 
+    
+    if ( hoursUntillChekin < 24) {
+      return res.status(400).json({
+        success: false, 
+        data: false , 
+        error: "CANCELLATION_DEADLINE_PASSED"
+      })
+    }
+
+    const cancelledBooking = await prisma.bookings.update({
+      where : {
+        id : bookingId as string
+      }, 
+      data : {
+        cancelled_at: now, 
+        status: bookingStatus.CANCELLED, 
+      }, 
+      select: {
+        id: true, 
+        status: true, 
+        cancelled_at: true
+      }
+    })
+
+    res.status(200).json({
+      success: true, 
+      data:{
+        id : cancelledBooking.id, 
+        status: cancelledBooking.status, 
+        cancelledAt : cancelledBooking.cancelled_at
+      }, 
+      error: null
+    })
+    
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      data: null,
+      error: "INVALID_REQUEST",
+    });
+  }
 })
 
 export default router;
