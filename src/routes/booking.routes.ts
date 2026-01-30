@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import {prisma} from '../../db';
 import authMiddleware from "../middleware/authmiddleware";
+import { bookingStatus } from "../../generated/prisma/enums";
 
 const router = Router();
 
@@ -140,9 +141,87 @@ router.post('/', authMiddleware, async (req:Request, res: Response) => {
     }
 })
 
-router.get('/', authMiddleware, async (req:Request, res: Response) => {
+router.get("/", authMiddleware, async (req: Request, res: Response) => {
+  //@ts-ignore
+  const user = req.user;
+  const statusParam = req.query.status as string | undefined;
 
+  let statusFilter: bookingStatus | undefined;
+
+  if (statusParam) {
+    if (!Object.values(bookingStatus).includes(statusParam as bookingStatus)) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: "INVALID_STATUS",
+      });
+    }
+
+    statusFilter = statusParam as bookingStatus;
+  }
+
+  try {
+    const bookings = await prisma.bookings.findMany({
+      where: {
+        user_id: user.id,
+        ...(statusFilter && { status: statusFilter }),
+      }, 
+      select: {
+        id: true, 
+        room_id: true, 
+        hotel_id: true, 
+        room: {
+          select: {
+            room_number: true, 
+            room_type: true, 
+            hotel: {
+              select: {
+                name: true
+              }
+            }
+          }
+        },
+        check_in_date: true,
+        check_out_date: true, 
+        guests: true, 
+        total_price: true, 
+        status: true, 
+        booking_date: true
+      }
+    });
+
+    const formattedBooking = bookings.map((booking) => ({
+      id : booking.id, 
+      roomId : booking.room_id, 
+      hotelId : booking.hotel_id, 
+      hotelName: booking.room.hotel.name, 
+      roomNumber : booking.room.room_number, 
+      roomType: booking.room.room_type, 
+      checkInDate : booking.check_in_date, 
+      checkOutDate: booking.check_out_date, 
+      guests: booking.guests, 
+      totalPrice: booking.total_price, 
+      status : booking.status, 
+      bookingDate: booking.booking_date
+    }))
+
+    return res.status(200).json({
+      success: true,
+      data: formattedBooking,
+      error: null,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      data: null,
+      error: "INVALID_SCHEMA",
+    });
+  }
+});
+
+router.post('/:bookingId/cancel', authMiddleware, async (req:Request, res: Response) => {
+
+  
 })
-router.post('/:bookingId/cancel', authMiddleware, async (req:Request, res: Response) => {})
 
 export default router;
