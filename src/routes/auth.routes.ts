@@ -8,6 +8,8 @@ const router = Router();
 router.post("/signup", async (req: Request, res: Response) => {
   const { name, email, password, phone, role } = req.body;
 
+  const userRole = role.toUpperCase();
+
   if (!name || !email || !password || !role) {
     return res.status(400).json({
       success: false,
@@ -37,7 +39,7 @@ router.post("/signup", async (req: Request, res: Response) => {
         email,
         password: hashedPassword,
         phone,
-        role,
+        role: userRole,
       },
     });
 
