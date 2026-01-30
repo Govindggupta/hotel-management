@@ -2,15 +2,11 @@ import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { prisma } from "../../db";
 
-interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-  };
+interface JwtPayloadWithId extends JwtPayload {
+  id?: string;
 }
 
-const authMiddleware = async (req: AuthRequest,res: Response,  next: NextFunction) => {
+const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // const authHeader = req.headers.authorization;
     const token = req.headers.authorization;
@@ -24,10 +20,10 @@ const authMiddleware = async (req: AuthRequest,res: Response,  next: NextFunctio
     }
 
 
-    const decodedToken = jwt.verify(token as string,process.env.JWT_SECRET as string) as JwtPayload;
+    const decodedToken = jwt.verify(token as string, process.env.JWT_SECRET as string) as JwtPayloadWithId;
 
     const user = await prisma.users.findUnique({
-      where: { id: decodedToken.id },
+      where: { id: decodedToken.id! },
     });
 
     if (!user) {
